@@ -17,6 +17,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi import Request
 
 
 # ============================================================
@@ -29,6 +33,9 @@ logger = logging.getLogger("fifa_engine")
 #   APP SETUP
 # ============================================================
 app = FastAPI(title="FIFA 2026 Unified Operations Engine")
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -173,7 +180,9 @@ async def analyze_threat(request: ThreatRequest):
     return response
 
 @app.get("/traffic-feed")
-async def traffic_feed():
+@limiter.limit("10/minute")
+async def traffic_feed(request: Request):
+
     # Mocking live intercepted traffic
     return [
         {"time": datetime.now(timezone.utc).strftime("%H:%M:%S"), "origin": f"{random.randint(10,255)}.{random.randint(10,255)}.X.X", "intent": "TCP_SYN", "raw_intent": "Port Scan", "status": "FILTERED", "payload": "0x00000000"},
