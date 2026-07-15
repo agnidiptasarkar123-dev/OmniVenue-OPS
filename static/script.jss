@@ -1,1 +1,564 @@
+// ============================================================
+//  CONFIG & STATE
+// ============================================================
+const API = '';
+let selectedVenue = 'metlife';
+let venues = [];
+let currentMatches = [];
+let chatOpen = false;
+let currentZonesData = [];
 
+// ============================================================
+//  CLOCK
+// ============================================================
+function updateClock() {
+  const now = new Date();
+  document.getElementById('live-clock').textContent = now.toLocaleTimeString('en-US', { hour12: false, timeZone: 'UTC' }) + ' UTC';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============================================================
+//  DATA FETCHERS
+// ============================================================
+async function fetchJSON(url) {
+  try { const r = await fetch(API + url); return await r.json(); } catch(e) { console.error('Fetch error:', url, e); return null; }
+}
+
+async function loadVenues() {
+  const data = await fetchJSON('/api/stadium/venues');
+  if (!data) return;
+  venues = data;
+  renderVenueMap(data);
+  renderVenueSelector(data);
+}
+
+async function loadMatches() {
+  const data = await fetchJSON('/api/stadium/matches');
+  if (!data) return;
+  currentMatches = data;
+  renderMatches(data);
+  const live = data.filter(m => m.status === 'LIVE');
+  document.getElementById('stat-matches').textContent = live.length;
+}
+
+async function loadLiveData() {
+  const data = await fetchJSON(`/api/stadium/live/${selectedVenue}`);
+  if (!data) return;
+  currentZonesData = data.zones;
+  renderZones(data.zones);
+  renderSensors(data.sensors);
+  renderConcessions(data.concessions);
+  document.getElementById('stat-fans').textContent = (data.avg_density * 1000 || 0).toLocaleString(); // Mock fan count based on density
+  updateFlowChart(data.avg_density * 1000);
+  drawGravityWells(data.zones);
+  
+  if (data.threat_active) {
+    document.body.classList.add('threat-active');
+  } else if (!document.body.classList.contains('chaos-active')) {
+    document.body.classList.remove('threat-active');
+  }
+}
+
+async function loadIncidents() {
+  const data = await fetchJSON(`/api/stadium/incidents/${selectedVenue}`);
+  if (!data) return;
+  document.getElementById('incident-feed').innerHTML = '';
+  renderIncidents(data);
+  document.getElementById('stat-incidents').textContent = data.filter(i => i.status === 'ACTIVE').length;
+}
+
+// 🔗 STANDOUT 4: LIVE TELEMETRY LOGS 🔗
+async function loadLogs() {
+  const data = await fetchJSON('/api/stadium/logs');
+  if (!data || !data.logs) return;
+  const tbody = document.getElementById('logs-tbody');
+  tbody.innerHTML = data.logs.map(log => `
+    <tr>
+      <td>${log.time}</td>
+      <td class="log-type-${log.type}">${log.type}</td>
+      <td>${log.event}</td>
+    </tr>
+  `).join('');
+}
+
+// 🔗 STANDOUT 5: GENAI CROWD CONTROL 🔗
+async function loadOptimizer() {
+  const data = await fetchJSON('/api/stadium/crowd-control');
+  if (!data) return;
+  const banner = document.getElementById('optimizer-banner');
+  const text = document.getElementById('optimizer-text');
+  text.textContent = data.alert;
+  if(data.alert.includes('CRITICAL')) {
+    banner.classList.add('alert-active');
+  } else {
+    banner.classList.remove('alert-active');
+  }
+}
+
+// ============================================================
+//  VENUE MAP RENDERER
+// ============================================================
+function renderVenueMap(venues) {
+  // Replaced with static interactive SVG blueprint. No more dynamic dots.
+}
+
+function highlightZone(zoneName, density) {
+  // Clear existing highlights
+  document.querySelectorAll('.svg-zone').forEach(el => {
+    el.classList.remove('highlight-red', 'highlight-yellow', 'highlight-green');
+    el.classList.add('svg-dim');
+  });
+  
+  // Apply highlight to target
+  const target = document.getElementById('svg-zone-' + zoneName);
+  if (target) {
+    target.classList.remove('svg-dim');
+    if (density > 80) target.classList.add('highlight-red');
+    else if (density > 60) target.classList.add('highlight-yellow');
+    else target.classList.add('highlight-green');
+  }
+  
+  // Reset dim after 3 seconds
+  setTimeout(() => {
+    document.querySelectorAll('.svg-zone').forEach(el => {
+      el.classList.remove('svg-dim', 'highlight-red', 'highlight-yellow', 'highlight-green');
+    });
+  }, 3000);
+}
+
+function renderVenueSelector(venues) {
+  const sel = document.getElementById('venue-selector');
+  sel.innerHTML = venues.map(v => 
+    `<button class="venue-btn ${v.id === selectedVenue ? 'active' : ''}" onclick="selectVenue('${v.id}')">${v.name}</button>`
+  ).join('');
+}
+
+function selectVenue(id) {
+  selectedVenue = id;
+  renderVenueSelector(venues);
+  loadLiveData();
+}
+
+// ============================================================
+//  MATCHES & ZONES RENDERER
+// ============================================================
+function renderMatches(matches) {
+  const html = matches.map(m => `
+    <div class="match-card ${m.status === 'LIVE' ? 'live' : ''}">
+      <div class="match-status ${m.status.toLowerCase()}-status">${m.status} ${m.status==='LIVE' ? `· ${m.minute}'` : m.time}</div>
+      <div class="match-teams">
+        <div class="team-info"><span class="team-flag">${m.home_flag}</span><span class="team-name">${m.home}</span></div>
+        <div class="match-score">${m.status === 'UPCOMING' ? 'vs' : `${m.home_score} - ${m.away_score}`}</div>
+        <div class="team-info away"><span class="team-flag">${m.away_flag}</span><span class="team-name">${m.away}</span></div>
+      </div>
+      <div class="match-venue">📍 ${m.venue} (${m.city})</div>
+    </div>
+  `).join('');
+  document.getElementById('match-cards').innerHTML = html;
+}
+
+function renderZones(zones) {
+  const html = zones.map(z => {
+    let color = z.density > 80 ? 'red' : z.density > 60 ? 'yellow' : 'green';
+    return `
+      <div class="zone-cell ${color}" onclick="highlightZone('${z.name}', ${z.density})">
+        <div class="zone-name">${z.name}</div>
+        <div class="zone-density">${z.density}%</div>
+        <div class="zone-bar"><div class="zone-bar-fill" style="width:${z.density}%"></div></div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('zone-grid').innerHTML = html;
+}
+
+// ============================================================
+//  SENSORS & CONCESSIONS
+// ============================================================
+function renderSensors(sensors) {
+  if(!sensors || !sensors.temperature) return;
+  const config = [
+    { label: "Core Temperature", val: `${sensors.temperature}°C`, icon: "🌡️" },
+    { label: "Acoustic Pressure", val: `${sensors.noise_db} dB`, icon: "🔊" },
+    { label: "Air Particulates", val: `${sensors.air_quality} AQI`, icon: "💨" },
+    { label: "Wind Velocity", val: `${sensors.wind_speed} km/h`, icon: "🌪️" }
+  ];
+  document.getElementById('sensor-feed').innerHTML = config.map(c => `
+    <div class="sensor-row">
+      <div class="sensor-icon">${c.icon}</div>
+      <div class="sensor-info"><div class="sensor-label">${c.label}</div></div>
+      <div class="sensor-value">${c.val}</div>
+    </div>
+  `).join('');
+}
+
+function renderConcessions(concs) {
+  const html = concs.map(c => {
+    const timeClass = c.wait_min > 8 ? 'slow' : c.wait_min > 4 ? 'med' : 'fast';
+    return `
+      <div class="concession-item">
+        <div class="c-icon">🍔</div>
+        <div class="c-info">
+          <div class="c-name">${c.name}</div>
+          <div class="c-wait">Queue: ${c.queue_length} pax</div>
+        </div>
+        <div class="c-time ${timeClass}">${c.wait_min}m</div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('concession-feed').innerHTML = html;
+}
+
+// ============================================================
+//  INCIDENTS
+// ============================================================
+const resolvedIncidents = new Set();
+
+function renderIncidents(incidents) {
+  const now = new Date();
+  const nowUtcSecs = now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds();
+
+  const html = incidents.map(i => {
+    const uid = i.description + '|' + i.created_at;
+    let isResolved = resolvedIncidents.has(uid) || i.status === 'RESOLVED';
+    
+    if (!isResolved && !i.description.includes('Standby Mode')) {
+      const parts = i.created_at.split(':');
+      if (parts.length === 3) {
+        const iSecs = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+        let diff = nowUtcSecs - iSecs;
+        if (diff < 0) diff += 86400; // handle midnight wrap
+        if (diff > 18) {
+          resolvedIncidents.add(uid);
+          isResolved = true;
+        }
+      }
+    }
+
+    let buttonHtml = '';
+    let cardStyle = '';
+    let boxShadow = '';
+
+    if (!i.description.includes('Standby Mode')) {
+      if (isResolved) {
+        buttonHtml = `<button disabled style="background: transparent; border: 1px solid #00ff88; color: #00ff88; padding: 4px 10px; border-radius: 4px; cursor: default; font-size: 11px; white-space: nowrap;">✓ RESOLVED</button>`;
+        cardStyle = 'border-left-color: #00ff88;';
+        boxShadow = 'box-shadow: inset 2px 0 10px rgba(0, 255, 136, 0.1);';
+      } else {
+        buttonHtml = `<button class="resolve-btn" data-uid="${uid}" style="background: transparent; border: 1px solid #ffaa00; color: #ffaa00; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; transition: all 0.3s; white-space: nowrap;">DEPLOY TEAM</button>`;
+      }
+    }
+
+    return `
+    <div class="incident-card" style="display: flex; justify-content: space-between; align-items: center; transition: all 0.3s; ${cardStyle} ${boxShadow}">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div class="incident-badge ${i.severity.toLowerCase()}">${i.severity}</div>
+        <div class="incident-info">
+          <div class="incident-desc">${i.description}</div>
+          <div class="incident-meta">${i.created_at} UTC · ${i.zone}</div>
+        </div>
+      </div>
+      ${buttonHtml}
+    </div>
+    `;
+  }).join('');
+  document.getElementById('incident-feed').innerHTML = html;
+}
+
+// Event Delegation for Resolve Buttons
+document.getElementById('incident-feed').addEventListener('click', function(e) {
+  if (e.target && e.target.classList.contains('resolve-btn')) {
+    const btn = e.target;
+    const uid = btn.getAttribute('data-uid');
+    if (uid) resolvedIncidents.add(uid);
+    
+    btn.innerText = "✓ RESOLVED";
+    btn.style.color = "#00ff88";
+    btn.style.borderColor = "#00ff88";
+    btn.disabled = true;
+    btn.style.cursor = "default";
+    btn.classList.remove('resolve-btn');
+    
+    const card = btn.closest('.incident-card');
+    if (card) {
+      card.style.borderLeftColor = "#00ff88";
+      card.style.boxShadow = "inset 2px 0 10px rgba(0, 255, 136, 0.1)";
+    }
+  }
+});
+
+// ============================================================
+//  CHAOS MODE (Standout 2)
+// ============================================================
+async function triggerChaos() {
+  const btn = document.getElementById('btn-chaos');
+  btn.innerText = "Initiating Chaos...";
+  try {
+    const res = await fetch('/api/stadium/chaos', { method: 'POST' });
+    const data = await res.json();
+    if(data.chaos_mode) {
+      document.body.classList.add('chaos-active');
+      document.querySelectorAll('.glass-card').forEach(c => c.classList.add('critical-alert'));
+      btn.innerText = "RESTORE STABILITY";
+    } else {
+      document.body.classList.remove('chaos-active');
+      document.querySelectorAll('.glass-card').forEach(c => c.classList.remove('critical-alert'));
+      btn.innerText = "Simulate Critical Emergency Pattern";
+    }
+    loadLiveData();
+    loadIncidents();
+    loadLogs();
+  } catch(e) { console.error(e); }
+}
+
+// ============================================================
+//  COMPLIANCE REPORT (Standout 6)
+// ============================================================
+async function generateReport() {
+  const modal = document.getElementById('report-modal');
+  const body = document.getElementById('report-body');
+  modal.classList.add('active');
+  body.innerHTML = 'Compiling official report...';
+  
+  try {
+    const res = await fetch('/api/stadium/generate-report?venue=' + selectedVenue, { method: 'POST' });
+    const data = await res.json();
+    body.innerHTML = data.html;
+  } catch(e) {
+    body.innerHTML = `<span style="color:var(--status-crimson)">Failed to generate report.</span>`;
+  }
+}
+function closeReport() {
+  document.getElementById('report-modal').classList.remove('active');
+}
+
+// ============================================================
+//  CHATBOT (Standout 3)
+// ============================================================
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chatbot-panel').classList.toggle('open');
+}
+
+function sendQuick(txt) {
+  document.getElementById('chat-input').value = txt;
+  sendChat();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if(!msg) return;
+  input.value = '';
+  
+  const msgsDiv = document.getElementById('chat-messages');
+  msgsDiv.innerHTML += `<div class="chat-msg user">${msg}</div>`;
+  msgsDiv.scrollTop = msgsDiv.scrollHeight;
+  
+  try {
+    const res = await fetch('/api/stadium/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: msg, venue_id: selectedVenue })
+    });
+    const data = await res.json();
+    msgsDiv.innerHTML += `<div class="chat-msg bot">${data.response}</div>`;
+    msgsDiv.scrollTop = msgsDiv.scrollHeight;
+    
+    if (data.threat_alert) {
+      document.body.classList.add('threat-active');
+    }
+    
+    if (data.stand_down) {
+      document.body.classList.remove('threat-active', 'chaos-active');
+    } else if (data.threat_alert === false && !document.body.classList.contains('chaos-active')) {
+      document.body.classList.remove('threat-active');
+    }
+    
+    // Auto-refresh to show system updates
+    loadLiveData();
+    loadLogs();
+  } catch(e) {
+    msgsDiv.innerHTML += `<div class="chat-msg bot">Connection Error</div>`;
+  }
+}
+
+// ============================================================
+//  VOICE COMMAND (Standout 4)
+// ============================================================
+let recognition;
+let isListening = false;
+
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = function() {
+    isListening = true;
+    document.getElementById('chat-mic').classList.add('listening');
+  };
+
+  recognition.onresult = function(event) {
+    const transcript = event.results[0][0].transcript;
+    document.getElementById('chat-input').value = transcript;
+    sendChat();
+  };
+
+  recognition.onerror = function(event) {
+    console.error('Speech recognition error', event.error);
+    isListening = false;
+    document.getElementById('chat-mic').classList.remove('listening');
+  };
+
+  recognition.onend = function() {
+    isListening = false;
+    document.getElementById('chat-mic').classList.remove('listening');
+  };
+}
+
+function toggleVoice() {
+  if (!recognition) {
+    alert("Speech recognition not supported in this browser.");
+    return;
+  }
+  if (isListening) {
+    recognition.stop();
+  } else {
+    recognition.start();
+  }
+}
+
+// ============================================================
+//  CHARTS & VIZ (MOCK)
+// ============================================================
+let flowChart;
+function initCharts() {
+  const ctx = document.getElementById('flowChart').getContext('2d');
+  flowChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: Array(20).fill(''),
+      datasets: [{
+        label: 'Zone Flow',
+        data: Array(20).fill(50),
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { display: false }, y: { display: false, min: 0, max: 100000 } }
+    }
+  });
+}
+
+function updateFlowChart(val) {
+  if(!flowChart) return;
+  const data = flowChart.data.datasets[0].data;
+  data.shift();
+  data.push(val + Math.random()*2000 - 1000); // slight variance
+  flowChart.update();
+}
+
+function drawGravityWells(zones) {
+  const canvas = document.getElementById('gravityCanvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.offsetWidth;
+  const h = canvas.height = canvas.offsetHeight;
+  ctx.clearRect(0,0,w,h);
+  
+  zones.forEach(z => {
+    if(z.density > 50) {
+      const x = Math.random() * (w-40) + 20;
+      const y = Math.random() * (h-40) + 20;
+      const r = z.density / 2;
+      
+      const grad = ctx.createRadialGradient(x,y,0,x,y,r);
+      grad.addColorStop(0, z.density > 80 ? 'rgba(239, 68, 68, 0.4)' : 'rgba(59, 130, 246, 0.3)');
+      grad.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x,y,r,0,Math.PI*2);
+      ctx.fill();
+    }
+  });
+}
+
+document.querySelectorAll('.stadium-zone').forEach(zone => {
+    zone.style.cursor = 'pointer';
+    zone.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const zoneName = this.getAttribute('data-zone');
+        
+        let densityText = "0%"; 
+        document.querySelectorAll('.zone-card, .matrix-card, .zone-cell').forEach(card => {
+            if(card.innerText.includes(zoneName)) {
+                const match = card.innerText.match(/\d+%/);
+                if(match) densityText = match[0];
+            }
+        });
+        
+        let density = parseInt(densityText) || 0;
+        
+        let stadiumCap = 65000;
+        let currentVenueName = "";
+        if (typeof venues !== 'undefined' && venues.length > 0) {
+            const currentVenue = venues.find(v => v.id === selectedVenue);
+            if (currentVenue) {
+                stadiumCap = currentVenue.capacity;
+                currentVenueName = currentVenue.name;
+            }
+        }
+        
+        let activeMatch = false;
+        if (typeof currentMatches !== 'undefined') {
+            activeMatch = currentMatches.some(m => m.status === 'LIVE' && m.venue.toLowerCase().includes(currentVenueName.toLowerCase()));
+        }
+
+        if (density === 0 && activeMatch) {
+            density = Math.floor(Math.random() * (85 - 45 + 1)) + 45;
+        }
+
+        const totalCapacity = Math.round(stadiumCap / 9);
+        const liveFans = Math.round(totalCapacity * (density / 100));
+        const estClearance = liveFans > 0 ? Math.round(liveFans / 450) || 1 : 0;
+
+        const tooltip = document.getElementById('zone-tooltip');
+        tooltip.innerHTML = `
+            <strong style="color: #00f0ff; font-size: 14px; text-transform: uppercase;">${zoneName}</strong>
+            <hr style="border: 0; border-top: 1px solid rgba(0,240,255,0.2); margin: 6px 0;"/>
+            <div>Cap: <span style="color: #fff; font-weight: bold;">${totalCapacity.toLocaleString()}</span></div>
+            <div>Live: <span style="color: #fff; font-weight: bold;">${liveFans.toLocaleString()} (${density}%)</span></div>
+            <div style="color: #ffaa00; margin-top: 4px;">⚡ Clearance: ${estClearance} mins</div>
+            <div style="color: #00ff88; font-size: 11px; margin-top: 2px;">➔ Action: Route to Nearest Exit</div>
+        `;
+        tooltip.style.left = (e.clientX + 15) + 'px';
+        tooltip.style.top = (e.clientY + 15) + 'px';
+        tooltip.style.display = 'block';
+    });
+});
+
+document.addEventListener('click', function() {
+    const tooltip = document.getElementById('zone-tooltip');
+    if(tooltip) tooltip.style.display = 'none';
+});
+
+// ============================================================
+//  INIT
+// ============================================================
+initCharts();
+setInterval(() => {
+  loadVenues();
+  loadMatches();
+  loadLiveData();
+  loadIncidents();
+  loadLogs();
+  loadOptimizer();
+}, 3000);
+loadVenues(); loadMatches(); loadLiveData(); loadIncidents(); loadLogs(); loadOptimizer();
