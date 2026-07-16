@@ -174,21 +174,22 @@
   </div>
   <div class="chat-input-area">
     <input type="text" id="chat-input" placeholder="Type a command or query..." onkeypress="if(event.key==='Enter')sendChat()">
-    <button class="chat-mic" id="chat-mic" onclick="toggleVoice()" title="Voice Command">🎤</button>
-    <button class="chat-send" onclick="sendChat()">➤</button>
+    <button class="chat-mic" id="chat-mic" aria-label="Use Voice Command" onclick="toggleVoice()" title="Voice Command"></button>
+    <button class="chat-send" aria-label="Send Message" onclick="sendChat()">></button>
+
   </div>
 </div>
 
 <!-- ═══════════════ COMPLIANCE REPORT MODAL ═══════════════ -->
 <div class="modal-overlay" id="report-modal">
   <div class="modal-content">
-    <div class="modal-close" onclick="closeReport()">×</div>
+<div class="modal-close" role="button" aria-label="Close Compliance Report" tabindex="0" onclick="closeReport()">x</div>
     <div class="section-title"><span class="icon">📄</span> Official FIFA Compliance Report <span class="line"></span></div>
     <div class="modal-body" id="report-body">
       Loading report...
     </div>
     <div class="modal-footer" style="text-align: right; margin-top: 20px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
-      <button class="btn-print" onclick="window.print()">[ 📥 Print / Download PDF ]</button>
+<button class="btn-print" aria-label="Print or Download PDF Report" onclick="window.print()">[ 🖨️ Print / Download PDF ]</button>
     </div>
   </div>
 </div>
