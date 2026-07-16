@@ -7,6 +7,8 @@ import logging
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from fastapi.middleware.gzip import GZipMiddleware
+
 
 import requests
 from deep_translator import GoogleTranslator
@@ -36,6 +38,7 @@ app = FastAPI(title="FIFA 2026 Unified Operations Engine")
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
