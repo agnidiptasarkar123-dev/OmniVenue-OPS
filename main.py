@@ -55,6 +55,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stadium.db")
 
 def init_db():
+    """Initializes the SQLite database and creates necessary tables for stadium incidents."""
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
         c.execute("""
@@ -132,6 +133,7 @@ LATEST_INTERCEPT = None
 
 @app.post("/analyze", response_model=ThreatResponse)
 async def analyze_threat(request: ThreatRequest):
+    """Analyzes incoming network traffic for cyber-physical threats using the Neural Core logic."""
     global LATEST_INTERCEPT
     
     # Mock analysis logic simulating OmniVenue OPS Neural Core
@@ -185,6 +187,7 @@ async def analyze_threat(request: ThreatRequest):
 @app.get("/traffic-feed")
 @limiter.limit("10/minute")
 async def traffic_feed(request: Request):
+    """Streams real-time mocked intercepted traffic data for the live security dashboard."""
 
     # Mocking live intercepted traffic
     return [
@@ -654,6 +657,7 @@ async def stadium_incidents(venue_id: str = "metlife"):
 # 🔗 STANDOUT 2: CHAOS MODE 🔗
 @app.post("/api/stadium/chaos")
 async def trigger_chaos():
+    """Activates Chaos Mode to simulate simultaneous physical and cyber emergencies in the venue."""
     with _state_lock:
         LIVE_STATE["chaos_mode"] = not LIVE_STATE["chaos_mode"]
         
@@ -678,6 +682,7 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/stadium/chat")
 async def stadium_chat(req: ChatRequest):
+    """Handles agentic chatbot interactions for stadium telemetry, logistics, and emergency control."""
     original_query = req.query.strip()
     if not original_query:
         return {"response": "I didn't catch that. Could you please specify your query?"}
@@ -885,6 +890,7 @@ async def generate_report(venue: str = "metlife"):
 # ============================================================
 @app.get("/", response_class=HTMLResponse)
 async def serve_sentinel_dashboard():
+    """Serves the primary HTML dashboard interface for the OmniVenue OPS system."""
     return FileResponse("index.html")
 
 @app.get("/stadium/", response_class=HTMLResponse)
