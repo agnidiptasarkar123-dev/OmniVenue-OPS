@@ -167,7 +167,7 @@
       <div class="chat-status">● System Online — Listening for Actions</div>
     </div>
   </div>
-  <div class="chat-messages" id="chat-messages">
+  <div class="chat-messages" id="chat-messages" aria-live="polite">
     <div class="chat-msg bot">I am your OmniVenue OPS Copilot. You can ask for information or issue direct commands like: "Reroute security drones to Sector 4" or "Isolate Gate A".</div>
   </div>
   <div class="quick-actions">
@@ -176,7 +176,7 @@
     <span class="quick-action" onclick="sendQuick('Open emergency gates at Zone A')">🚪 Open Gates</span>
   </div>
   <div class="chat-input-area">
-    <input type="text" id="chat-input" placeholder="Type a command or query..." onkeypress="if(event.key==='Enter')sendChat()">
+    <input type="text" id="chat-input" placeholder="Type a command or query..." tabindex="0" aria-label="Chat Input Field" onkeypress="if(event.key==='Enter')sendChat()">
     <button class="chat-mic" id="chat-mic" aria-label="Use Voice Command" onclick="toggleVoice()" title="Voice Command">🎙️</button>
     <button class="chat-send" aria-label="Send Message" onclick="sendChat()">></button>
 
