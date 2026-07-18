@@ -8,7 +8,9 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.concurrency import run_in_threadpool # THREADPOOL ADD KORA HOLO
+from fastapi.concurrency import run_in_threadpool 
+from fastapi import Header
+from fastapi import Depends
 
 import requests
 from deep_translator import GoogleTranslator
@@ -38,15 +40,20 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+def verify_admin(x_api_key: str = Header(None)):
+    """Checks if the request has the correct admin key in headers."""
+    expected_key = os.environ.get("ADMIN_KEY", "")
+    if not expected_key or x_api_key != expected_key:
+        raise HTTPException(status_code=401, detail="Unauthorized: invalid or missing API key")
 
-# EKHANE STRICT CORS BLOCK ADD KORA HOLO
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:8000",
         "http://localhost:8001",
-        "https://omnivenue-ops.onrender.com", # URL CHANGE KORBI
-        "https://*.onrender.com"
+        "https://omnivenue-ops.onrender.com",
+
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
@@ -209,15 +216,13 @@ async def analyze_threat(request: ThreatRequest):
         # 🔗 STANDOUT 1: CYBER-PHYSICAL THREAT ORCHESTRATION 🔗
         # Push cyber threat into the physical stadium DB
         try:
-            with sqlite3.connect(DB_PATH) as conn:
-                c = conn.cursor()
-                iid = f"INC-{uuid.uuid4().hex[:8].upper()}"
-                desc = f"CYBER-PHYSICAL LINK: OmniVenue OPS blocked malicious network payload from IP {request.source_ip}. Security teams alerted."
-                c.execute(
-                    "INSERT INTO stadium_incidents (id, venue_id, type, severity, description, zone, status, created_at) VALUES (?,?,?,?,?,?,?,?)",
-                    (iid, "metlife", "SECURITY", "CRITICAL", desc, "Network Core", "ACTIVE", datetime.now(timezone.utc).strftime("%H:%M:%S"))
-                )
-                conn.commit()
+           await run_in_threadpool(
+               log_incident_sync,
+               f"INC-{uuid.uuid4().hex[:8].upper()}", "metlife", "SECURITY", "CRITICAL",
+               f"CYBER-PHYSICAL LINK: OmniVenue OPS blocked malicious network payload from IP {request.source_ip}. Security teams alerted.",
+               "Network Core"
+    )
+
         except Exception as e:
             logger.error(f"Cyber-physical link failed: {e}")
             
@@ -244,14 +249,14 @@ class ActionRequest(BaseModel):
     correct_label: Optional[str] = None
 
 @app.post("/acknowledge")
-async def ack_intercept(req: ActionRequest):
+async def ack_intercept(req: ActionRequest, auth: None = Depends(verify_admin)):
     global LATEST_INTERCEPT
     if LATEST_INTERCEPT and LATEST_INTERCEPT["id"] == req.id:
         LATEST_INTERCEPT["status"] = "ACKNOWLEDGED"
     return {"status": "success"}
 
 @app.post("/feedback")
-async def fb_intercept(req: ActionRequest):
+async def fb_intercept(req: ActionRequest, auth: None = Depends(verify_admin)):
     global LATEST_INTERCEPT
     if LATEST_INTERCEPT and LATEST_INTERCEPT["id"] == req.id:
         LATEST_INTERCEPT["status"] = "ACKNOWLEDGED"
@@ -694,7 +699,7 @@ async def stadium_incidents(venue_id: str = "metlife"):
         return LIVE_STATE["venue_incidents"][venue_id]
 
 @app.post("/api/stadium/chaos")
-async def trigger_chaos() -> dict:
+async def trigger_chaos(auth: None = Depends(verify_admin)) -> dict:
     """Activates Chaos Mode to simulate simultaneous physical and cyber emergencies."""
     with _state_lock:
         LIVE_STATE["chaos_mode"] = not LIVE_STATE["chaos_mode"]
@@ -724,7 +729,7 @@ async def stadium_chat(req: ChatRequest):
     original_query = req.query.strip()
     if not original_query:
         return {"response": "I didn't catch that. Could you please specify your query?"}
-    
+
     # HARDCODE ENGLISH ROUTING
     if any(word in original_query.lower() for word in ["score", "match", "recent", "fire", "clear", "status", "stand", "gate", "food"]):
         user_lang = 'en'
@@ -733,16 +738,20 @@ async def stadium_chat(req: ChatRequest):
             user_lang = detect(original_query)
         except:
             user_lang = 'en'
-        
+
     try:
         if user_lang != 'en':
-            q_en = GoogleTranslator(source='auto', target='en').translate(original_query).lower()
+            translated = await run_in_threadpool(
+                GoogleTranslator(source='auto', target='en').translate, original_query
+            )
+            q_en = translated.lower()
         else:
             q_en = original_query.lower()
     except Exception as e:
         logger.error(f"Translation error: {e}")
         q_en = original_query.lower()
         user_lang = 'en'
+
 
     # Omni-Context Intent Dictionary
     intents = {
@@ -791,13 +800,12 @@ async def stadium_chat(req: ChatRequest):
             })
             # Log DB incident
             try:
-                with sqlite3.connect(DB_PATH) as conn:
-                    c = conn.cursor()
-                    c.execute(
-                        "INSERT INTO stadium_incidents (id, venue_id, type, severity, description, zone, status, created_at) VALUES (?,?,?,?,?,?,?,?)",
-                        (f"INC-{uuid.uuid4().hex[:8].upper()}", req.venue_id, "EMERGENCY", "CRITICAL", f"Sentiment-triggered emergency from query: {original_query}", "ALL ZONES", "ACTIVE", datetime.now(timezone.utc).strftime("%H:%M:%S"))
-                    )
-                    conn.commit()
+                await run_in_threadpool(
+                    log_incident_sync,
+                    f"INC-{uuid.uuid4().hex[:8].upper()}", req.venue_id, "EMERGENCY", "CRITICAL",
+                    f"Sentiment-triggered emergency from query: {original_query}", "ALL ZONES"
+             )
+
             except Exception as e:
                 logger.error(f"Emergency DB err: {e}")
     else:
@@ -879,7 +887,10 @@ async def stadium_chat(req: ChatRequest):
     # Translate back to user language
     if user_lang != 'en' and response_msg:
         try:
-            final_response = GoogleTranslator(source='en', target=user_lang).translate(response_msg)
+            final_response = await run_in_threadpool(
+                    GoogleTranslator(source='en', target=user_lang).translate, response_msg
+              )
+
         except Exception as e:
             logger.error(f"Translation back error: {e}")
             final_response = response_msg
