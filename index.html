@@ -57,20 +57,20 @@
         <!-- Outer Stadium Rim -->
         <rect x="10" y="10" width="380" height="280" rx="40" fill="#1e293b" stroke="#334155" stroke-width="4"/>
         
-        <!-- Grandstands (Interactive Zones) -->
-        <path id="svg-zone-North Stand" class="svg-zone stadium-zone" data-zone="North Stand" d="M 60,30 L 340,30 L 310,70 L 90,70 Z" />
-        <path id="svg-zone-South Stand" class="svg-zone stadium-zone" data-zone="South Stand" d="M 90,230 L 310,230 L 340,270 L 60,270 Z" />
-        <path id="svg-zone-West Concourse" class="svg-zone stadium-zone" data-zone="West Concourse" d="M 30,60 L 70,90 L 70,210 L 30,240 Z" />
-        <path id="svg-zone-East Concourse" class="svg-zone stadium-zone" data-zone="East Concourse" d="M 370,60 L 330,90 L 330,210 L 370,240 Z" />
-        
-        <!-- Corners / Facilities -->
-        <path id="svg-zone-VIP Lounge" class="svg-zone stadium-zone" data-zone="VIP Lounge" d="M 30,30 L 60,30 L 90,70 L 70,90 L 30,60 Z" />
-        <path id="svg-zone-Food Court" class="svg-zone stadium-zone" data-zone="Food Court" d="M 370,30 L 340,30 L 310,70 L 330,90 L 370,60 Z" />
-        <path id="svg-zone-Gate A" class="svg-zone stadium-zone" data-zone="Gate A" d="M 30,270 L 60,270 L 90,230 L 70,210 L 30,240 Z" />
-        <path id="svg-zone-Gate B" class="svg-zone stadium-zone" data-zone="Gate B" d="M 370,270 L 340,270 L 310,230 L 330,210 L 370,240 Z" />
-        
-        <!-- Main Entry Gate (Bottom Center) -->
-        <rect id="svg-zone-Gate C" class="svg-zone stadium-zone" data-zone="Gate C" x="160" y="275" width="80" height="20" rx="5" />
+      <!-- Grandstands (Interactive Zones) -->
+<path id="svg-zone-North Stand" class="svg-zone stadium-zone" data-zone="North Stand" d="M 60,30 L 340,30 L 310,70 L 90,70 Z" role="button" tabindex="0" aria-label="North Stand zone" />
+<path id="svg-zone-South Stand" class="svg-zone stadium-zone" data-zone="South Stand" d="M 90,230 L 310,230 L 340,270 L 60,270 Z" role="button" tabindex="0" aria-label="South Stand zone" />
+<path id="svg-zone-West Concourse" class="svg-zone stadium-zone" data-zone="West Concourse" d="M 30,60 L 70,90 L 70,210 L 30,240 Z" role="button" tabindex="0" aria-label="West Concourse zone" />
+<path id="svg-zone-East Concourse" class="svg-zone stadium-zone" data-zone="East Concourse" d="M 370,60 L 330,90 L 330,210 L 370,240 Z" role="button" tabindex="0" aria-label="East Concourse zone" />
+
+<!-- Corners / Facilities -->
+<path id="svg-zone-VIP Lounge" class="svg-zone stadium-zone" data-zone="VIP Lounge" d="M 30,30 L 60,30 L 90,70 L 70,90 L 30,60 Z" role="button" tabindex="0" aria-label="VIP Lounge zone" />
+<path id="svg-zone-Food Court" class="svg-zone stadium-zone" data-zone="Food Court" d="M 370,30 L 340,30 L 310,70 L 330,90 L 370,60 Z" role="button" tabindex="0" aria-label="Food Court zone" />
+<path id="svg-zone-Gate A" class="svg-zone stadium-zone" data-zone="Gate A" d="M 30,270 L 60,270 L 90,230 L 70,210 L 30,240 Z" role="button" tabindex="0" aria-label="Gate A zone" />
+<path id="svg-zone-Gate B" class="svg-zone stadium-zone" data-zone="Gate B" d="M 370,270 L 340,270 L 310,230 L 330,210 L 370,240 Z" role="button" tabindex="0" aria-label="Gate B zone" />
+
+<!-- Main Entry Gate (Bottom Center) -->
+<rect id="svg-zone-Gate C" class="svg-zone stadium-zone" data-zone="Gate C" x="160" y="275" width="80" height="20" rx="5" role="button" tabindex="0" aria-label="Gate C zone" />
         
         <!-- Pitch -->
         <rect x="70" y="70" width="260" height="160" rx="2" class="svg-pitch" />
@@ -112,7 +112,7 @@
     <div class="section-title"><span class="icon">📊</span> Zone Density Matrix <span class="line"></span></div>
     <div class="zone-grid" id="zone-grid"></div>
     <div class="gravity-well-viz">
-      <canvas class="gravity-canvas" id="gravityCanvas"></canvas>
+     <canvas class="gravity-canvas" id="gravityCanvas" role="img" aria-label="Gravity well congestion visualization showing crowd density hotspots across the venue"></canvas>
     </div>
   </section>
 
@@ -121,7 +121,8 @@
     <div class="section-title"><span class="icon">📡</span> IoT Sensor Telemetry <span class="line"></span></div>
     <div id="sensor-feed"></div>
     <div class="section-title" style="margin-top:20px"><span class="icon">📈</span> Predictive Flow <span class="line"></span></div>
-    <div class="chart-wrapper"><canvas id="flowChart"></canvas></div>
+    <div class="chart-wrapper"><canvas id="flowChart" role="img" aria-label="Predictive crowd flow chart showing density trends over time"></canvas>
+</div>
   </section>
 
   <!-- ──── INCIDENTS ──── -->
@@ -186,7 +187,7 @@
 <!-- ═══════════════ COMPLIANCE REPORT MODAL ═══════════════ -->
 <div class="modal-overlay" id="report-modal">
   <div class="modal-content">
-<div class="modal-close" role="button" aria-label="Close Compliance Report" tabindex="0" onclick="closeReport()">x</div>
+<button class="modal-close" aria-label="Close Compliance Report" onclick="closeReport()">×</button>
     <div class="section-title"><span class="icon">📄</span> Official FIFA Compliance Report <span class="line"></span></div>
     <div class="modal-body" id="report-body">
       Loading report...
@@ -197,6 +198,18 @@
   </div>
 </div>
 <div id="zone-tooltip" style="display: none; position: fixed; z-index: 999999 !important; background: rgba(10, 15, 30, 0.95); backdrop-filter: blur(10px); border: 2px solid #00f0ff; color: #fff; padding: 12px; border-radius: 8px; font-family: sans-serif; box-shadow: 0 0 15px rgba(0, 240, 255, 0.4); pointer-events: none;"></div>
+  <script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.svg-zone').forEach(function(zone) {
+        zone.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                zone.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            }
+        });
+    });
+});
+</script>
   <script src="/static/script.js"></script>
 
 </body>
