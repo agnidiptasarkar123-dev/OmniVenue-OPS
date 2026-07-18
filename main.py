@@ -8,7 +8,7 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 from fastapi.middleware.gzip import GZipMiddleware
-
+from fastapi.concurrency import run_in_threadpool # THREADPOOL ADD KORA HOLO
 
 import requests
 from deep_translator import GoogleTranslator
@@ -23,7 +23,6 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi import Request
-
 
 # ============================================================
 #   LOGGING
@@ -40,41 +39,39 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# --- High-Impact AI & Chaos Tests (Boosts Testing Score) ---
-def test_chatbot_intent_routing():
-    """Test if the AI chatbot correctly processes telemetry intents"""
-    payload = {"query": "What is the live score?", "venue_id": "metlife"}
-    response = client.post("/api/stadium/chat", json=payload)
-    assert response.status_code == 200
-    assert "response" in response.json()
-    assert isinstance(response.json()["threat_alert"], bool)
-
-def test_chaos_mode_activation():
-    """Test if Chaos Mode triggers emergency protocols successfully"""
-    response = client.post("/api/stadium/chaos")
-    assert response.status_code == 200
-    assert "chaos_mode" in response.json()
+# EKHANE STRICT CORS BLOCK ADD KORA HOLO
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8000",
+        "http://localhost:8001",
+        "https://https://omnivenue-ops.onrender.com", # URL CHANGE KORBI
+        "https://*.onrender.com"
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # ============================================================
-#   SECURITY & EFFICIENCY HEADERS (Top 100 Booster)
+#   SECURITY & EFFICIENCY HEADERS
 # ============================================================
 @app.middleware("http")
 async def security_and_efficiency_headers(request: Request, call_next):
     response = await call_next(request)
     
-    # 1. Security Headers (Boosts Security Score)
+    # 1. Security Headers
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     
-    # 2. Efficiency & Caching Headers (Boosts Efficiency Score)
+    # 2. Efficiency & Caching Headers
     if request.url.path.startswith("/static"):
-        # Cache static files for a year (Super fast load)
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     else:
-        # Prevent caching for dynamic API routes
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         
     return response
@@ -82,6 +79,7 @@ async def security_and_efficiency_headers(request: Request, call_next):
 # ============================================================
 #   DATABASE
 # ============================================================
+
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stadium.db")
 
 def init_db():
@@ -685,23 +683,29 @@ async def stadium_incidents(venue_id: str = "metlife"):
         return LIVE_STATE["venue_incidents"][venue_id]
 
 # 🔗 STANDOUT 2: CHAOS MODE 🔗
+def _log_chaos_db_sync(iid, venue):
+    """Synchronous DB writer intended to run in a threadpool."""
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO stadium_incidents (id, venue_id, type, severity, description, zone, status, created_at) VALUES (?,?,?,?,?,?,?,?)",
+            (iid, venue, "INFRASTRUCTURE", "CRITICAL", "CHAOS MODE ACTIVATED: Simultaneous power failure and crowd surge simulated.", "ALL ZONES", "ACTIVE", datetime.now(timezone.utc).strftime("%H:%M:%S"))
+        )
+        conn.commit()
+
 @app.post("/api/stadium/chaos")
-async def trigger_chaos():
+async def trigger_chaos() -> dict:
     """Activates Chaos Mode to simulate simultaneous physical and cyber emergencies in the venue."""
     with _state_lock:
         LIVE_STATE["chaos_mode"] = not LIVE_STATE["chaos_mode"]
         
-        # Trigger DB incident
-        try:
-            with sqlite3.connect(DB_PATH) as conn:
-                c = conn.cursor()
-                c.execute(
-                    "INSERT INTO stadium_incidents (id, venue_id, type, severity, description, zone, status, created_at) VALUES (?,?,?,?,?,?,?,?)",
-                    (f"INC-{uuid.uuid4().hex[:8].upper()}", "metlife", "INFRASTRUCTURE", "CRITICAL", "CHAOS MODE ACTIVATED: Simultaneous power failure and crowd surge simulated.", "ALL ZONES", "ACTIVE", datetime.now(timezone.utc).strftime("%H:%M:%S"))
-                )
-                conn.commit()
-        except Exception as e:
-            logger.error(f"Chaos DB err: {e}")
+        # Trigger non-blocking DB incident via ThreadPool for max efficiency
+        if LIVE_STATE["chaos_mode"]:
+            try:
+                incident_id = f"INC-{uuid.uuid4().hex[:8].upper()}"
+                await run_in_threadpool(_log_chaos_db_sync, incident_id, "metlife")
+            except Exception as e:
+                logger.error(f"Chaos DB err: {e}")
             
     return {"status": "success", "chaos_mode": LIVE_STATE["chaos_mode"]}
 
