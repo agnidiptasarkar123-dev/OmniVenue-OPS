@@ -1202,6 +1202,9 @@ body.threat-active .svg-zone {
   font-size: 1.5rem;
   color: var(--corporate-slate);
   cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
 }
 
 .modal-body {
