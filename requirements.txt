@@ -7,3 +7,4 @@ langdetect
 pytest
 httpx
 slowapi
+pytest-cov
