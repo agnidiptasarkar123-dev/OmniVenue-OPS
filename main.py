@@ -48,6 +48,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
+# ============================================================
+#   SECURITY & EFFICIENCY HEADERS (Top 100 Booster)
+# ============================================================
+@app.middleware("http")
+async def security_and_efficiency_headers(request: Request, call_next):
+    response = await call_next(request)
+    
+    # 1. Security Headers (Boosts Security Score)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    
+    # 2. Efficiency & Caching Headers (Boosts Efficiency Score)
+    if request.url.path.startswith("/static"):
+        # Cache static files for a year (Super fast load)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    else:
+        # Prevent caching for dynamic API routes
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        
+    return response
 
 # ============================================================
 #   DATABASE
