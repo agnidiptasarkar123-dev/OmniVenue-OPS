@@ -5,6 +5,7 @@
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.14+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)](https://github.com/agnidiptasarkar123-dev/OmniVenue-OPS/actions)
+[![Coverage](https://img.shields.io/badge/Coverage-77%25-yellowgreen.svg)]()
 
 
 ## 📌 Overview
@@ -67,6 +68,7 @@ To execute the automated test suite verifying intent-routing, auth behavior, and
    ```bash
    pytest --cov=main --cov-report=term-missing
    ```
+* **Test Coverage:** Achieved **77%** code coverage, verified via pytest-cov.
 
 ## 📌 Hackathon Instructions Alignment (Evaluation Criteria)
 
