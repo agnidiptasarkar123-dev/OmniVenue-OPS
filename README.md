@@ -40,6 +40,7 @@ pip install -r requirements.txt
 
 ## Environment Variables:
 export ADMIN_KEY=your-secret-admin-key
+export GEMINI_API_KEY=your-gemini-api-key
 
 ## Run the FastAPI server locally:
 uvicorn main:app --host 0.0.0.0 --port 8001 --reload
