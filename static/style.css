@@ -1227,3 +1227,14 @@ body.threat-active .svg-zone {
 .modal-body li {
   margin-bottom: 8px;
 }
+/* ---- FOCUS INDICATORS (Accessibility) ---- */
+button:focus-visible,
+.venue-btn:focus-visible,
+.quick-action:focus-visible,
+.svg-zone:focus-visible,
+input:focus-visible,
+.modal-close:focus-visible {
+  outline: 2px solid var(--corporate-blue-light);
+  outline-offset: 2px;
+}
+
