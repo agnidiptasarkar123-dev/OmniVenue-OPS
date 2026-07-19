@@ -118,6 +118,7 @@ GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5
 
 def call_gemini(prompt: str):
     if not GEMINI_API_KEY:
+        logger.error("GEMINI_API_KEY is not set — skipping Gemini call")
         return None
     try:
         resp = requests.post(
@@ -128,8 +129,9 @@ def call_gemini(prompt: str):
         resp.raise_for_status()
         return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
     except Exception as e:
-        logger.debug(f"Gemini call failed: {e}")
+        logger.error(f"Gemini call failed: {e}")
         return None
+
 # ============================================================
 #   ASYNC DB THREADPOOL WORKER (Boosts Efficiency)
 # ============================================================
