@@ -718,6 +718,32 @@ async def trigger_chaos(auth: None = Depends(verify_admin)) -> dict:
             
     return {"status": "success", "chaos_mode": LIVE_STATE["chaos_mode"]}
 
+@app.get("/api/stadium/ai-summary")
+async def ai_venue_summary(venue: str = "metlife"):
+    """Generates an AI-powered natural language summary of current venue status using Gemini."""
+    with _state_lock:
+        zones = LIVE_STATE["zones"].get(venue, [])
+        avg_density = int(sum(z["density"] for z in zones) / len(zones)) if zones else 0
+        chaos = LIVE_STATE["chaos_mode"]
+
+    venue_data = VENUE_MAP.get(venue, {})
+    venue_name = venue_data.get("name", venue)
+
+    prompt = (
+        f"You are a stadium operations assistant. In one short sentence, summarize the current status "
+        f"of {venue_name}: crowd density is {avg_density}%, chaos mode is {'active' if chaos else 'inactive'}. "
+        f"Keep it professional and reassuring if density is normal, or urgent if density is high."
+    )
+
+    summary = await run_in_threadpool(call_gemini, prompt)
+
+    if not summary:
+        summary = f"{venue_name} is currently at {avg_density}% crowd density. " + (
+            "Chaos protocols are active." if chaos else "All systems operating normally."
+        )
+
+    return {"venue": venue_name, "avg_density": avg_density, "summary": summary}
+
 # 🔗 STANDOUT 3: AGENTIC CHATBOT 🔗
 class ChatRequest(BaseModel):
     query: str
