@@ -133,13 +133,13 @@ def call_gemini(prompt: str):
 # ============================================================
 #   ASYNC DB THREADPOOL WORKER (Boosts Efficiency)
 # ============================================================
-def log_incident_sync(iid: str, venue: str, type: str, severity: str, desc: str, zone: str):
+def log_incident_sync(iid: str, venue: str, incident_type: str, severity: str, desc: str, zone: str):
     """Executes DB writes synchronously but will be called via ThreadPool to prevent blocking."""
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
         c.execute(
             "INSERT INTO stadium_incidents (id, venue_id, type, severity, description, zone, status, created_at) VALUES (?,?,?,?,?,?,?,?)",
-            (iid, venue, type, severity, desc, zone, "ACTIVE", datetime.now(timezone.utc).strftime("%H:%M:%S"))
+            (iid, venue, incident_type, severity, desc, zone, "ACTIVE", datetime.now(timezone.utc).strftime("%H:%M:%S"))
         )
         conn.commit()
 
